@@ -1,187 +1,167 @@
 <template>
-  <view class="mine-container" :style="{height: `${windowHeight}px`}">
-    <!--顶部个人信息栏-->
-    <view class="header-section">
-      <view class="flex padding justify-between">
-        <view class="flex align-center">
-          <view v-if="!avatar" class="cu-avatar xl round bg-white">
-            <view class="iconfont icon-people text-gray icon"></view>
-          </view>
-          <image v-if="avatar" @click="handleToAvatar" :src="avatar" class="cu-avatar xl round" mode="widthFix">
-          </image>
-          <view v-if="!name" @click="handleToLogin" class="login-tip">
-            点击登录
-          </view>
-          <view v-if="name" @click="handleToInfo" class="user-info">
-            <view class="u_title">
-              用户名：{{ name }}
-            </view>
-          </view>
-        </view>
-        <view @click="handleToInfo" class="flex align-center">
-          <text>个人信息</text>
-          <view class="iconfont icon-right"></view>
-        </view>
+  <view class="page">
+    <zd-nav-bar title="我的"></zd-nav-bar>
+
+    <view class="header">
+      <image class="header-bg" src="/static/images/rescue/mine-header.jpg" mode="aspectFill"></image>
+      <image class="avatar" :src="userStore.avatar" mode="aspectFill"></image>
+      <text class="account">账号：{{ userStore.phone || '--' }}</text>
+    </view>
+
+    <view class="menu">
+      <view v-for="(m, i) in menus" :key="m.text" class="menu-item" @click="m.action">
+        <image class="menu-icon" :src="'/static/images/rescue/menu-' + i + '.png'" mode="aspectFit"></image>
+        <text class="menu-text">{{ m.text }}</text>
+        <uni-icons type="right" size="14" color="#555"></uni-icons>
       </view>
     </view>
 
-    <view class="content-section">
-      <view class="mine-actions grid col-4 text-center">
-        <view class="action-item" @click="handleJiaoLiuQun">
-          <view class="iconfont icon-friendfill text-pink icon"></view>
-          <text class="text">交流群</text>
-        </view>
-        <view class="action-item" @click="handleBuilding">
-          <view class="iconfont icon-service text-blue icon"></view>
-          <text class="text">在线客服</text>
-        </view>
-        <view class="action-item" @click="handleBuilding">
-          <view class="iconfont icon-community text-mauve icon"></view>
-          <text class="text">反馈社区</text>
-        </view>
-        <view class="action-item" @click="handleBuilding">
-          <view class="iconfont icon-dianzan text-green icon"></view>
-          <text class="text">点赞我们</text>
-        </view>
-      </view>
+    <zd-tab-bar current="mine"></zd-tab-bar>
 
-      <view class="menu-list">
-        <view class="list-cell list-cell-arrow" @click="handleToEditInfo">
-          <view class="menu-item-box">
-            <view class="iconfont icon-user menu-icon"></view>
-            <view>编辑资料</view>
-          </view>
-        </view>
-        <view class="list-cell list-cell-arrow" @click="handleHelp">
-          <view class="menu-item-box">
-            <view class="iconfont icon-help menu-icon"></view>
-            <view>常见问题</view>
-          </view>
-        </view>
-        <view class="list-cell list-cell-arrow" @click="handleAbout">
-          <view class="menu-item-box">
-            <view class="iconfont icon-aixin menu-icon"></view>
-            <view>关于我们</view>
-          </view>
-        </view>
-        <view class="list-cell list-cell-arrow" @click="handleToSetting">
-          <view class="menu-item-box">
-            <view class="iconfont icon-setting menu-icon"></view>
-            <view>应用设置</view>
-          </view>
-        </view>
+    <!-- 客服电话弹层（还原截图样式，uni.showActionSheet 在 H5 下样式差异较大） -->
+    <view v-if="sheetVisible" class="sheet-mask" @click="sheetVisible = false">
+      <view class="sheet" @click.stop>
+        <view class="sheet-title">{{ servicePhone }}</view>
+        <view class="sheet-item" @click="call">呼叫</view>
+        <view class="sheet-gap"></view>
+        <view class="sheet-item" @click="sheetVisible = false">取消</view>
       </view>
-
     </view>
   </view>
 </template>
 
 <script setup>
+  import { ref } from 'vue'
+  import config from '@/config'
   import { useUserStore } from '@/store'
-  import { computed , getCurrentInstance } from "vue"
 
-  const { proxy } = getCurrentInstance()
-  const name = useUserStore().name
-  const avatar = computed(() => useUserStore().avatar)
-  const windowHeight = computed(() => uni.getSystemInfoSync().windowHeight - 50)
+  const userStore = useUserStore()
+  userStore.ensureLogin()
 
-  function handleToInfo() {
-    proxy.$tab.navigateTo('/pages/mine/info/index')
-  }
+  const servicePhone = config.appInfo.servicePhone
 
-  function handleToEditInfo() {
-    proxy.$tab.navigateTo('/pages/mine/info/edit')
-  }
+  const menus = [
+    { text: '客服', action: callService },
+    { text: '设置', action: () => uni.navigateTo({ url: '/pages/mine/setting' }) },
+    { text: '优惠券', action: () => uni.navigateTo({ url: '/pages/coupon/index' }) },
+    { text: '开票历史', action: () => uni.showToast({ title: '暂无开票记录', icon: 'none' }) }
+  ]
 
-  function handleToSetting() {
-    proxy.$tab.navigateTo('/pages/mine/setting/index')
-  }
+  const sheetVisible = ref(false)
 
-  function handleToLogin() {
-    proxy.$tab.reLaunch('/pages/login')
+  function callService() {
+    sheetVisible.value = true
   }
 
-  function handleToAvatar() {
-    proxy.$tab.navigateTo('/pages/mine/avatar/index')
-  }
-      
-  function handleHelp() {
-    proxy.$tab.navigateTo('/pages/mine/help/index')
-  }
-      
-  function handleAbout() {
-    proxy.$tab.navigateTo('/pages/mine/about/index')
-  }
-      
-  function handleJiaoLiuQun() {
-    proxy.$modal.showToast('QQ群：①133713780(满)、②146013835(满)、③189091635')
-  }
-      
-  function handleBuilding() {
-    proxy.$modal.showToast('模块建设中~')
+  function call() {
+    sheetVisible.value = false
+    uni.makePhoneCall({ phoneNumber: servicePhone })
   }
 </script>
 
 <style lang="scss" scoped>
-  page {
-    background-color: #f5f6f7;
+  .page {
+    min-height: 100vh;
+    background: #fff;
   }
 
-  .mine-container {
+  .header {
+    position: relative;
+    height: r(133);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header-bg {
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100%;
     height: 100%;
+  }
 
+  .avatar {
+    position: relative;
+    margin-top: r(26);
+    width: r(57);
+    height: r(57);
+    border-radius: 50%;
+    border: r(2) solid rgba(255, 255, 255, 0.7);
+    box-sizing: border-box;
+  }
 
-    .header-section {
-      padding: 15px 15px 45px 15px;
-      background-color: #3c96f3;
-      color: white;
+  .account {
+    position: relative;
+    margin-top: r(20);
+    font-size: r(13);
+    font-weight: 400;
+    color: #fff;
+  }
 
-      .login-tip {
-        font-size: 18px;
-        margin-left: 10px;
-      }
+  .menu-item {
+    height: r(56);
+    margin-left: r(18);
+    padding-right: r(22);
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f2f2f3;
+  }
 
-      .cu-avatar {
-        border: 2px solid #eaeaea;
+  .menu-icon {
+    width: r(15);
+    height: r(15);
+  }
 
-        .icon {
-          font-size: 40px;
-        }
-      }
+  .menu-text {
+    flex: 1;
+    margin-left: r(9);
+    font-size: r(14.5);
+    font-weight: 600;
+    color: #323643;
+  }
 
-      .user-info {
-        margin-left: 15px;
+  .sheet-mask {
+    position: fixed;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+  }
 
-        .u_title {
-          font-size: 18px;
-          line-height: 30px;
-        }
-      }
-    }
+  .sheet {
+    width: 100%;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #fff;
+    border-radius: r(12) r(12) 0 0;
+    overflow: hidden;
+  }
 
-    .content-section {
-      position: relative;
-      top: -50px;
+  .sheet-title {
+    height: r(64);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: r(12.5);
+    color: #888;
+    border-bottom: 1px solid #f0f0f0;
+  }
 
-      .mine-actions {
-        margin: 15px 15px;
-        padding: 20px 0px;
-        border-radius: 8px;
-        background-color: white;
+  .sheet-item {
+    height: r(56);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: r(15.5);
+    color: #000;
+  }
 
-        .action-item {
-          .icon {
-            font-size: 28px;
-          }
-
-          .text {
-            display: block;
-            font-size: 13px;
-            margin: 8px 0px;
-          }
-        }
-      }
-    }
+  .sheet-gap {
+    height: r(8);
+    background: #f7f7f7;
   }
 </style>

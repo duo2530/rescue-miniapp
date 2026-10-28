@@ -1,67 +1,56 @@
 import config from '@/config'
 import { getToken } from '@/utils/auth'
 import errorCode from '@/utils/errorCode'
-import { useUserStore } from '@/store/modules/user'
-import { toast, showConfirm, tansParams } from '@/utils/common'
+import { toast, tansParams } from '@/utils/common'
+import mockRequest from '@/mock'
 
 let timeout = 10000
 const baseUrl = config.baseUrl
 
-const request = config => {
-  // 是否需要设置 token
-  const isToken = (config.headers || {}).isToken === false
-  config.header = config.header || {}
-  if (getToken() && !isToken) {
-    config.header['Authorization'] = 'Bearer ' + getToken()
+/**
+ * 统一请求入口。后端约定返回 { code, msg, data }，code === 200 为成功。
+ * config.useMock 为 true 时交给 /mock 在前端处理，页面与 api 层无需区分。
+ */
+const request = options => {
+  options.header = options.header || {}
+  if (getToken() && (options.headers || {}).isToken !== false) {
+    options.header['Authorization'] = 'Bearer ' + getToken()
   }
   // get请求映射params参数
-  if (config.params) {
-    let url = config.url + '?' + tansParams(config.params)
+  if (options.params) {
+    let url = options.url + '?' + tansParams(options.params)
     url = url.slice(0, -1)
-    config.url = url
+    options.url = url
   }
+  const send = config.useMock ? mockRequest(options) : uni.request({
+    method: options.method || 'get',
+    timeout: options.timeout || timeout,
+    url: options.baseUrl || baseUrl + options.url,
+    data: options.data,
+    header: options.header,
+    dataType: 'json'
+  }).then(res => res.data)
+
   return new Promise((resolve, reject) => {
-    uni.request({
-        method: config.method || 'get',
-        timeout: config.timeout ||  timeout,
-        url: config.baseUrl || baseUrl + config.url,
-        data: config.data,
-        header: config.header,
-        dataType: 'json'
-      }).then(response => {
-        const res = response
-        const code = res.data.code || 200
-        const msg = errorCode[code] || res.data.msg || errorCode['default']
-        if (code === 401) {
-          showConfirm('登录状态已过期，您可以继续留在该页面，或者重新登录?').then(res => {
-            if (res.confirm) {
-              useUserStore().logOut().then(res => {
-                uni.reLaunch({ url: '/pages/login' })
-              })
-            }
-          })
-          reject('无效的会话，或者会话已过期，请重新登录。')
-        } else if (code === 500) {
-          toast(msg)
-          reject('500')
-        } else if (code !== 200) {
-          toast(msg)
-          reject(code)
-        }
-        resolve(res.data)
-      })
-      .catch(error => {
-        let { message } = error
-        if (message === 'Network Error') {
-          message = '后端接口连接异常'
-        } else if (message.includes('timeout')) {
-          message = '系统接口请求超时'
-        } else if (message.includes('Request failed with status code')) {
-          message = '系统接口' + message.slice(-3) + '异常'
-        }
-        toast(message)
-        reject(error)
-      })
+    send.then(res => {
+      const code = res.code || 200
+      const msg = errorCode[code] || res.msg || errorCode['default']
+      if (code !== 200) {
+        toast(msg)
+        reject(res)
+        return
+      }
+      resolve(res.data)
+    }).catch(error => {
+      let message = (error && error.errMsg) || String(error)
+      if (message.includes('timeout')) {
+        message = '系统接口请求超时'
+      } else if (message.includes('request:fail')) {
+        message = '后端接口连接异常'
+      }
+      toast(message)
+      reject(error)
+    })
   })
 }
 
